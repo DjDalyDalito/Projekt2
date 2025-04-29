@@ -1,31 +1,42 @@
-/*#include <hidboot.h>
-#include <usbhub.h>
-#include <Wire.h>*/
-#include <Mouse.h>
+#include <hidboot.h> /*fler usb enheter*/
+#include <usbhub.h> /*prata med mus*/
+#include <SPI.h> /*prata med arduino*/
+#include <Mouse.h> /*styra musen*/
 
-/*USB Usb; /*Skapar ett usb objekt */
+USB Usb; /*Skapar ett usb objekt */
 /*USBHub Hub(&Usb); /*Skapar ett usb-hub objekt med referens och utgångspunkt till usb objektet */
 /*HIDBoot < USB_HID_PROTOCOL_KEYBOARD | USB_HID_PROTOCOL_MOUSE Hid> HidKBM(&Usb); /* Ett HIDBoot-objekt som hanterar kommunikation med USB-HID-enheter i det här fallet tangentbordet and musen*/
-/*HIDBoot < USB_HID_PROTOCOL_MOUSE Hid> HidMouse(&Usb); /*Ett HIDBoot-obhejt som enbart hanterar kommunikation med musen */
+HIDBoot<USB_HID_PROTOCOL_MOUSE>HidMouse(&Usb); /*Ett HIDBoot-obhejt som enbart hanterar kommunikation med musen */
 
 int neg = -127; /*Mouse.move supportar bara 128px per funktionsanrop*/
 int pos = 127;
+
+int SCREEN_WIDTH = 960; /*1920/2 - mitten på skärmen*/
+int SCREEN_HEIGHT = 540; /*1080/2*/
+int middleX = (SCREEN_WIDTH/2);
+int middleY = (SCREEN_HEIGHT/2);
+int targetY = 0;
+int targetX = 0;
+bool active = false; /*rör vi musen?*/
 
 /*
 int lmb;
 int rmb;
 int mmb;
+*/
 
-class mousereport : public mousereporter {
-  void OnMousemove(mouseinfo);
-  void OnLeftButtonUp();
-  void OnLeftButtonDown();
-  void OnRightButtonUp();
-  void OnRightButtonDown();
-  void OnMiddleButtonUp();
-  void OnMiddleButtonDown();
-}
+class mousereport : public MouseReportParser {
+  void OnMouseMove(MOUSEINFO * mouseinfo) override { /*vi måste ersätta klassens nuvarande info därav nödvändigt med override*/
+    if (!active)
+    {
+      Mouse.move(mouseinfo -> dX, mouseinfo -> dY, 0);
+      middleX = constrain(middleX + mouseinfo->dX, 0, SCREEN_WIDTH);
+      middleY = constrain(middleY + mouseinfo->dY, 0, SCREEN_HEIGHT);
+    }
+  }
+} mouseParser /*parser som översätter rådata till data*/
 
+/*
 void mousereporter::OnMouseMove (mouseinfo)
 {
   Mouse.move(1, 1, 0);
@@ -59,12 +70,19 @@ void mousereporter::OnMiddleButtonUp (mouseinfo)
 void mousereporter::OnMiddleButtonDown (mouseinfo)
 {
   mmb = 1;
-}*/
+}
+*/
 
 void setup() {
-  Serial.begin(9600); /*Använd 151200 dvs 1 ms senare i projektet när den faktiskt är användbar*/
+
+  Serial.begin(9600); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
   while (!Serial); /*Väntar tills datorn faktiskt har öppnat porten*/
   Mouse.begin();
+  if (Usb.Init() != 0){
+    Serial.println("Init failed");
+    while(1);
+  }
+  Hidmouse.SetReportParser(0, &mouseparser); /*0 för första musen*/
 }
 
 void loop() {
