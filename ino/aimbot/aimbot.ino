@@ -34,7 +34,7 @@ class mousereport : public MouseReportParser {
       middleY = constrain(middleY + mouseinfo->dY, 0, SCREEN_HEIGHT);
     }
   }
-} mouseParser /*parser som översätter rådata till data*/
+} mouseParser; /*parser som översätter rådata till data*/
 
 /*
 void mousereporter::OnMouseMove (mouseinfo)
@@ -75,14 +75,14 @@ void mousereporter::OnMiddleButtonDown (mouseinfo)
 
 void setup() {
 
-  Serial.begin(9600); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
+  Serial.begin(151200); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
   while (!Serial); /*Väntar tills datorn faktiskt har öppnat porten*/
   Mouse.begin();
   if (Usb.Init() != 0){
     Serial.println("Init failed");
     while(1);
   }
-  Hidmouse.SetReportParser(0, &mouseparser); /*0 för första musen*/
+  HidMouse.SetReportParser(0, &mouseParser); /*0 för första musen*/
 }
 
 void loop() {
@@ -107,7 +107,9 @@ void processInput(char *line) {
   if (sscanf(line, "%d %d", &x, &y) == 2) { /*taget från google läser av texten och kollar om den hittar 2 heltal som motsvara y och x värderna */
     x = constrain(x, neg, pos); /*constrainar talet till max 127 minst -127*/
     y = constrain(y, neg, pos);
+    active = true;
     Mouse.move(x,y,0); /*inget på z-axeln*/
+    active = false;
     Serial.println("OK");
   } else {
     Serial.println("ERR");
