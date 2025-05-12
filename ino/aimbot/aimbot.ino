@@ -1,12 +1,17 @@
-#include <hidboot.h> /*fler usb enheter*/
-#include <usbhub.h> /*prata med mus*/
-#include <SPI.h> /*prata med arduino*/
+/*#include <hidboot.h> /*fler usb enheter*/
+/*#include <usbhub.h> /*prata med mus*/
+/*#include <SPI.h> /*prata med arduino*/
 #include <Mouse.h> /*styra musen*/
+#include <U8g2lib.h>
+#include <Wire.h>
 
-USB Usb; /*Skapar ett usb objekt */
+#define SW_PIN 16
+
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+/*USB Usb; /*Skapar ett usb objekt */
 /*USBHub Hub(&Usb); /*Skapar ett usb-hub objekt med referens och utgångspunkt till usb objektet */
 /*HIDBoot < USB_HID_PROTOCOL_KEYBOARD | USB_HID_PROTOCOL_MOUSE Hid> HidKBM(&Usb); /* Ett HIDBoot-objekt som hanterar kommunikation med USB-HID-enheter i det här fallet tangentbordet and musen*/
-HIDBoot<USB_HID_PROTOCOL_MOUSE>HidMouse(&Usb); /*Ett HIDBoot-obhejt som enbart hanterar kommunikation med musen */
+/*HIDBoot<USB_HID_PROTOCOL_MOUSE>HidMouse(&Usb); /*Ett HIDBoot-obhejt som enbart hanterar kommunikation med musen */
 
 int neg = -127; /*Mouse.move supportar bara 128px per funktionsanrop*/
 int pos = 127;
@@ -25,16 +30,16 @@ int rmb;
 int mmb;
 */
 
-class mousereport : public MouseReportParser {
+/*class mousereport : public MouseReportParser {
   void OnMouseMove(MOUSEINFO * mouseinfo) override { /*vi måste ersätta klassens nuvarande info därav nödvändigt med override*/
-    if (!active)
+    /*if (!active)
     {
       Mouse.move(mouseinfo -> dX, mouseinfo -> dY, 0);
       middleX = constrain(middleX + mouseinfo->dX, 0, SCREEN_WIDTH);
       middleY = constrain(middleY + mouseinfo->dY, 0, SCREEN_HEIGHT);
     }
   }
-} mouseParser; /*parser som översätter rådata till data*/
+} mouseParser;*/ /*parser som översätter rådata till data*/
 
 /*
 void mousereporter::OnMouseMove (mouseinfo)
@@ -74,11 +79,16 @@ void mousereporter::OnMiddleButtonDown (mouseinfo)
 */
 
 void setup() {
+  pinMode(SW_PIN, INPUT_PULLUP); // Joystickens knapp är nere
+  Serial.begin(9600); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
 
-  Serial.begin(151200); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
-  while (!Serial); /*Väntar tills datorn faktiskt har öppnat porten*/
   Mouse.begin();
-  if (Usb.Init() != 0){
+  u8g2.begin();
+  Serial.println("OK");
+  delay(1000);
+
+  /*while (!Serial); /*Väntar tills datorn faktiskt har öppnat porten*/
+  /*if (Usb.Init() != 0){
     Serial.println("Init failed");
     while(1);
   }
@@ -86,6 +96,23 @@ void setup() {
 }
 
 void loop() {
+  /*Usb.Task();*/
+  const int dx = 100;
+  const int dy = 100;
+  if (digitalRead(SW_PIN) == LOW) { // Tryckt ner
+  Mouse.move(dx, dy, 0); // Flytta muspekaren 10 pixlar till höger
+  
+  Serial.println("Moving");
+  Serial.print("X = ");
+  Serial.println(dx);
+  Serial.print("Y = ");
+  Serial.println(dy);
+
+  oledWrite(10, 20, String("X = ") + String(dx));
+  oledWrite(10, 35, String("Y = ") + String(dy));
+
+  delay(200); // Liten paus så det inte spammas
+}
   static char buffer[16]; /*buffer som vi samlar inputen i och skickar till processInput */
   static int index = 0; /*räknare som visar vart i bufferten nästa tecken ska hamna*/
   while (Serial.available()){ /*så länge det finns minst ett tecken att läsa från datorn*/
@@ -100,6 +127,13 @@ void loop() {
       index += 1; /*öka index*/
     }
   }
+}
+
+void oledWrite(int x, int y, String text){
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawStr(x, y, text.c_str());
+  u8g2.sendBuffer();
 }
 
 void processInput(char *line) {
