@@ -2,12 +2,11 @@
 /*#include <usbhub.h> /*prata med mus*/
 /*#include <SPI.h> /*prata med arduino*/
 #include <Mouse.h> /*styra musen*/
-#include <U8g2lib.h>
-#include <Wire.h>
+#include <U8g2lib.h> /*oled-grafiken*/
+#include <Wire.h> /*kommunicera med oled-skärmen*/
+#define SW_PIN 16 /*joystickens sw pin till raspberrys GP16*/
 
-#define SW_PIN 16
-
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE); /*initerar skärmen*/
 /*USB Usb; /*Skapar ett usb objekt */
 /*USBHub Hub(&Usb); /*Skapar ett usb-hub objekt med referens och utgångspunkt till usb objektet */
 /*HIDBoot < USB_HID_PROTOCOL_KEYBOARD | USB_HID_PROTOCOL_MOUSE Hid> HidKBM(&Usb); /* Ett HIDBoot-objekt som hanterar kommunikation med USB-HID-enheter i det här fallet tangentbordet and musen*/
@@ -24,12 +23,6 @@ int targetY = 0;
 int targetX = 0;
 bool active = false; /*rör vi musen?*/
 
-/*
-int lmb;
-int rmb;
-int mmb;
-*/
-
 /*class mousereport : public MouseReportParser {
   void OnMouseMove(MOUSEINFO * mouseinfo) override { /*vi måste ersätta klassens nuvarande info därav nödvändigt med override*/
     /*if (!active)
@@ -41,46 +34,9 @@ int mmb;
   }
 } mouseParser;*/ /*parser som översätter rådata till data*/
 
-/*
-void mousereporter::OnMouseMove (mouseinfo)
-{
-  Mouse.move(1, 1, 0);
-}
-
-void mousereporter::OnLeftButtonUp (mouseinfo)
-{
-  lmb = 0;
-}
-
-void mousereporter::OnLeftButtonDown (mouseinfo)
-{
-  lmb = 1;
-}
-
-void mousereporter::OnRightButtonUp (mouseinfo)
-{
-  rmb = 0;
-}
-
-void mousereporter::OnRightButtonDown (mouseinfo)
-{
-  rmb = 1;
-}
-
-void mousereporter::OnMiddleButtonUp (mouseinfo)
-{
-  mmb = 0;
-}
-
-void mousereporter::OnMiddleButtonDown (mouseinfo)
-{
-  mmb = 1;
-}
-*/
-
 void setup() {
   pinMode(SW_PIN, INPUT_PULLUP); // Joystickens knapp är nere
-  Serial.begin(9600); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
+  Serial.begin(115200); /*Använd 151200 bit-rate dvs 1 ms senare i projektet när den faktiskt är användbar*/
 
   Mouse.begin();
   u8g2.begin();
@@ -97,10 +53,10 @@ void setup() {
 
 void loop() {
   /*Usb.Task();*/
-  const int dx = 100;
-  const int dy = 100;
+  const int dx = 500;
+  const int dy = 0;
   if (digitalRead(SW_PIN) == LOW) { // Tryckt ner
-  Mouse.move(dx, dy, 0); // Flytta muspekaren 10 pixlar till höger
+  /*Mouse.move(dx, dy, 0); // Flytta muspekaren x pixlar till höger/vänster och y pixlar upp/ner*/
   
   Serial.println("Moving");
   Serial.print("X = ");
@@ -108,15 +64,14 @@ void loop() {
   Serial.print("Y = ");
   Serial.println(dy);
 
-  oledWrite(10, 20, String("X = ") + String(dx));
-  oledWrite(10, 35, String("Y = ") + String(dy));
+  oledWrite(10, 25, String("X = ") + String(dx), 10, 45, String("Y = ") + String(dy));
 
   delay(200); // Liten paus så det inte spammas
 }
   static char buffer[16]; /*buffer som vi samlar inputen i och skickar till processInput */
   static int index = 0; /*räknare som visar vart i bufferten nästa tecken ska hamna*/
-  while (Serial.available()){ /*så länge det finns minst ett tecken att läsa från datorn*/
-    char c = Serial.read(); /*plocka ut tecknet och lägg i c*/
+  while (Serial.available()){ /*så länge det finns minst ett tecken att läsa från python skriptet*/
+    char c = Serial.read(); /*plocka ut tecknet och lägg i c (behöver inte index här eftersom Serial.read har inbyggd tail)*/
     if (c == '\n'){ /*om det är slutet på raden*/
       buffer[index] = '\0'; /*gör om rådatan till sträng*/
       processInput(buffer); /*passerar in buffern i funktionen som utför draget*/
@@ -129,16 +84,17 @@ void loop() {
   }
 }
 
-void oledWrite(int x, int y, String text){
+void oledWrite(int x1, int y1, String text1, int x2, int y2, String text2){
   u8g2.clearBuffer();
   u8g2.setFont(u8g2_font_ncenB08_tr);
-  u8g2.drawStr(x, y, text.c_str());
+  u8g2.drawStr(x1, y1, text1.c_str());
+  u8g2.drawStr(x2, y2, text2.c_str());
   u8g2.sendBuffer();
 }
 
-void processInput(char *line) {
+void processInput(char line[]) { /*line kommer från processInput(buffer); i loop*/
   int x = 0, y = 0;
-  if (sscanf(line, "%d %d", &x, &y) == 2) { /*taget från google läser av texten och kollar om den hittar 2 heltal som motsvara y och x värderna */
+  if (sscanf(line, "%d %d", &x, &y) == 2) { /*taget från google läser av texten och kollar om den hittar 2 heltal som motsvarar y och x värderna */
     x = constrain(x, neg, pos); /*constrainar talet till max 127 minst -127*/
     y = constrain(y, neg, pos);
     active = true;
