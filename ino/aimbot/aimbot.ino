@@ -5,6 +5,11 @@
 #include <U8g2lib.h> /*oled-grafiken*/
 #include <Wire.h> /*kommunicera med oled-skärmen*/
 #define SW_PIN 16 /*joystickens sw pin till raspberrys GP16*/
+#define X_PIN        A0
+#define Y_PIN        A1
+#define RAW_DEADZONE 30 /*alla rörelser som är mer eller mindre 30 från joystickens mittpunkt kommer att ignoreras (def: (0-1023))*/
+#define SENSITIVITY  0.5
+int centerRawX, centerRawY; /*medelvärde för x och y i joystickens viloläge*/
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE); /*initerar skärmen*/
 /*USB Usb; /*Skapar ett usb objekt */
@@ -40,6 +45,16 @@ void setup() {
 
   Mouse.begin();
   u8g2.begin();
+
+  int sumX = 0, sumY = 0; /*summan för alla x och y i joystickens viloläge*/
+  for (int i = 0; i < 50; i++) { /*50 gånger räcker*/
+    sumX += analogRead(X_PIN);
+    sumY += analogRead(Y_PIN);
+    delay(5);
+  }
+  centerRawX = sumX / 50;
+  centerRawY = sumY / 50;
+
   Serial.println("OK");
   delay(1000);
 
@@ -53,12 +68,12 @@ void setup() {
 
 void loop() {
   /*Usb.Task();*/
-  const int dx = 500;
+  /*const int dx = 500;
   const int dy = 0;
   if (digitalRead(SW_PIN) == LOW) { // Tryckt ner
   /*Mouse.move(dx, dy, 0); // Flytta muspekaren x pixlar till höger/vänster och y pixlar upp/ner*/
   
-  Serial.println("Moving");
+  /*Serial.println("Moving");
   Serial.print("X = ");
   Serial.println(dx);
   Serial.print("Y = ");
@@ -67,7 +82,32 @@ void loop() {
   oledWrite(10, 25, String("X = ") + String(dx), 10, 45, String("Y = ") + String(dy));
 
   delay(200); // Liten paus så det inte spammas
-}
+}*/
+
+  if (digitalRead(SW_PIN) == HIGH) {
+    int rawX = analogRead(X_PIN) - centerRawX;
+    int rawY = analogRead(Y_PIN) - centerRawY;
+
+    if (abs(rawX) < RAW_DEADZONE) rawX = 0;
+    if (abs(rawY) < RAW_DEADZONE) rawY = 0;
+
+    if (rawX != 0 || rawY != 0) {
+      int joyX = map(rawX, -centerRawX, 1023 - centerRawX, neg, pos); /*x inmin inmax outmin outmax*/
+      int joyY = map(rawY, -centerRawY, 1023 - centerRawY, neg, pos);
+
+      joyX = int(joyX * SENSITIVITY);
+      joyY = int(joyY * SENSITIVITY);
+
+      Mouse.move(joyX, -joyY, 0);
+      oledWrite(10, 30, "Moving", 0, 0, "");
+    }
+  }
+
+  if (digitalRead(SW_PIN) == LOW) {
+    oledWrite(10, 30, "AIMBOT", 0, 0, "");
+    Serial.println("Moving");
+  }
+
   static char buffer[16]; /*buffer som vi samlar inputen i och skickar till processInput */
   static int index = 0; /*räknare som visar vart i bufferten nästa tecken ska hamna*/
   while (Serial.available()){ /*så länge det finns minst ett tecken att läsa från python skriptet*/

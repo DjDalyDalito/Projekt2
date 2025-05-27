@@ -19,9 +19,11 @@ UPPER_YELLOW = numpy.array([26,255,255])
     # - beräkna närmsta pixel
     # - skicka dessa koordinater
     # - vänta på "OK" från .ino 
-# 20 ms delay innan nästa iteration
+# delay innan nästa iteration
 
 def main():
+    FOV = int(input("Ange FOV (px): ") or 2560)
+    SMOOTH = int(input("Ange SMOOTH (steg): ") or 1)
     ser = serial.Serial(SERIAL_PORT, SERIAL_BIT_RATE, timeout = 0.1) #öppnar seriellport (COM5)
     time.sleep(2) #låt arduinon signalera OK
     ser.reset_input_buffer() #rensar all eventuell data vi har från serieporten
@@ -41,12 +43,14 @@ def main():
         ys, xs = numpy.where(mask > 0) #returnerar två arrayer, en med rader och en med kolumner där masken är vit
         if xs.size: #om listan inte är tom dvs om det finns gula punkter
             distance = (xs - mouse_x)**2 + (ys - mouse_y)**2 #behöver inte ta roten ur ;) minsta d^2 är också minsta d, sparar säkert nån ms
+            if distance.min() ** 0.5 > FOV:
+                continue
             index = numpy.argmin(distance) #ger indexet för minsta d^2 dvs närmsta punkten
             tx, ty = int(xs[index]), int(ys[index])
             while True:
-                dx = tx - mouse_x
-                dy = ty - mouse_y
-                if abs(dx) < 3 and abs(dy) < 3: # för att fixa flickering
+                dx = (tx - mouse_x) // SMOOTH
+                dy = (ty - mouse_y) // SMOOTH
+                if abs(dx) < 0.1 and abs(dy) < 0.1: # för att fixa flickering
                     break
                 sx = max(min(dx, 127), -127) #constrain i py - min(dx, 127) => större än 127 blir 127, max(..., -127) => mindre än -127 blir -127
                 sy = max(min(dy, 127), -127)
@@ -55,8 +59,7 @@ def main():
                     #printa error meddelande/ stäng av programmet om du inte får ett ok från serial port
                 mouse_x += sx
                 mouse_y += sy
-                time.sleep(0.005)
                 
-        time.sleep(0.02)
+        #time.sleep(0.01)
             
 main()
